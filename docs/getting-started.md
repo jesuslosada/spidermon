@@ -25,7 +25,7 @@ Now that everything is installed, you must define a validator for the items that
 
 
 ### Set up the Validators
-The validators define the expected structure for the items. As you can see in the [code for this tutorial](http://github.com/stummjr/spidermon-reddit-example), the `reddit` spider generates `NewsItem` objects with the scraped data:
+The validators define the expected structure for the items. They can be either Model Validators or JSON schema validators. As you can see in the [code for this tutorial](http://github.com/stummjr/spidermon-reddit-example), the `reddit` spider generates `NewsItem` objects with the scraped data:
 
 `items.py`:
 
@@ -34,6 +34,7 @@ The validators define the expected structure for the items. As you can see in th
         title = scrapy.Field()
         user = scrapy.Field()
 
+#### Model validators
 Now, you have to create a file called `validators.py` into the project folder and define the required data model for the items that your spider will collect:
 
 `validators.py`:
@@ -46,19 +47,13 @@ Now, you have to create a file called `validators.py` into the project folder an
         url = URLType(required=True)
         title = StringType(required=True, max_length=200)
         user = StringType(required=True, max_length=50)
+        
+Add the models to `SPIDERMON_VALIDATION_MODELS` in `settings.py`:
 
-After that, you need to enable the `ItemValidationPipeline`, set the validation model for your items and tell the pipeline to drop items that don't match the model:
-
-`settings.py`:
-
-    ITEM_PIPELINES = {
-        'spidermon.contrib.scrapy.pipelines.ItemValidationPipeline': 800,
-    }
     SPIDERMON_VALIDATION_MODELS = (
         'reddit_spidermon_demo.validators.NewsItem',
     )
-    SPIDERMON_VALIDATION_DROP_ITEMS_WITH_ERRORS = True
-
+    
 If spider generates few different types of item it's possible to define validation models per every item.
 The same is applicable for `SPIDERMON_VALIDATION_SCHEMAS`.
 Just define setting as a dict in `settings.py`, where keys are item class objects and validators are values,
@@ -72,6 +67,52 @@ one or several of them (list or tuple in that case):
     }
 
 Note, that only listed types of items will be processed in that case.
+
+#### JSON schema validators
+To use JSON schema validation, you need to create a schema first and put it in `schemas` folder located in the same directory as `spiders` folder.
+
+An example `schema.json`:
+
+    {
+      "$schema": "http://json-schema.org/draft-06/schema",
+      "required": [
+        "number",
+        "result"
+      ],
+      "type": "object",
+      "properties": {
+        "number": {
+          "type": "string",
+          "pattern": "^\\d{10}$"
+        },
+        "result": {
+          "type": "string"
+        }
+      }
+    }
+
+Once you have it, add the reference to the schema file in spider's `SPIDERMON_VALIDATION_SCHEMAS`
+
+    class Spider(AnotherSpider):
+        custom_settings = {
+            'SPIDERMON_VALIDATION_SCHEMAS': [
+                resource_filename('sharetracker', 'schemas/schema.json')
+            ]
+        }
+
+#### Validators setup
+Last but not least, you need to enable the `ItemValidationPipeline`, set the validation model for your items and tell the pipeline to drop items that don't match the model:
+
+`settings.py`:
+
+    ITEM_PIPELINES = {
+        'spidermon.contrib.scrapy.pipelines.ItemValidationPipeline': 800,
+    }
+    SPIDERMON_VALIDATION_MODELS = (
+        'reddit_spidermon_demo.validators.NewsItem',
+    )
+    SPIDERMON_VALIDATION_DROP_ITEMS_WITH_ERRORS = True
+
 
 You could also set the pipeline to include the validation error as a field in the item (although it may not be necessary, since the validation errors are included in the crawling stats and your monitor can check them once the spiders finishes):
 
